@@ -1,0 +1,82 @@
+#MSDS Spring 2018 
+##DATA 607 Data Aquisition and Management
+####Jiadi Li
+####Week 5 Assignment:Tidying and Transforming Data
+
+![](/Users/Asus-pc/Dropbox/Spring 2018/607 Data Acquisition and Management/Assignment/airlines.png) <br/><br/>
+1.Create a .CSV file that includes all of the informations above. Use a "wide" structure similar to how the information appears above, so that tidying and transformings as described below can be practiced.<br/><br/>
+
+2.Read the information from .CSV file into R.
+```{r}
+airlines.raw <- read.csv("https://raw.githubusercontent.com/xiaoxiaogao-DD/DATA607_Assignment5/master/airlines.csv",sep = ",")
+airlines.raw
+```
+
+Use $tidyr$ and $dplyr$ as needed to tidy and transform the data.
+```{r}
+colnames(airlines.raw)[1:2] <- c("airline","status") #add column names for columns with no title
+airlines.raw[[1]][2] <- airlines.raw[[1]][1] #fill empty cells with appropriate values based on the overall structure of the table
+airlines.raw[[1]][5] <- airlines.raw[[1]][4] #same as above
+airlines.raw
+```
+
+```{r}
+library(tidyr)
+
+airlines <- gather(airlines.raw,city,number.airlines,Los.Angeles:Seattle) #most important step: restructure the dataset so that it can be considered as tidy data
+
+library(dplyr)
+#airlines <- subset(airlines,status!="")
+airlines <- filter(airlines,status!="") #delete rows with no value (previously left blank for aesthetic reason), this step can be done with/without dplyr
+
+i <- 1
+while(i <= length(airlines$city)) {
+  airlines$city[i] <- gsub("\\."," ",airlines$city[i]) #remove ","(comma) between number.airlines so that as.numeric function can be applied
+  airlines$number.airlines[i] <- gsub(",","",airlines$number.airlines[i]) #remove the "."(dots) between city names for every row
+  i <- i + 1
+} 
+
+airlines$number.airlines <- as.numeric(airlines$number.airlines) #convert all number.airlines data into numeric data so that further calculation can be performed
+
+airlines
+```
+
+3.Perform analysis to compare the arrival delays for the two airlines.
+```{r}
+airlines.analysis <- airlines %>% group_by(airline,city) %>% summarise(total.airlines = sum(number.airlines)) #compute the sum of number.airlines for the same airport and city
+
+i <- 1
+rate.status <- vector()
+
+while(i <= length(airlines$number.airlines)){ #compute the percentage of on time/ delay for each airport and city and store the data along with the dataframe
+  ap <- airlines$airline[i]
+  ct <- airlines$city[i]
+  rate.status[i] <- round(airlines$number.airlines[i]/airlines.analysis$total.airlines[airlines.analysis$airline==ap & airlines.analysis$city == ct],3)
+  i <- i + 1 
+}
+
+airlines <- cbind(airlines,rate.status)
+airlines
+```
+```{r}
+airlines.delay <- filter(airlines,status=="delayed")
+airlines.delay
+
+library(ggplot2)
+ggplot(data=airlines.delay, aes(x=city,y=rate.status,fill=airline)) +
+    geom_bar(stat="identity", position=position_dodge()) +
+    ggtitle("Delay Rate by Airline by City") +
+    xlab("city") + 
+    ylab("rate") #create a ggplot compare delay rate for each airline and each city
+```
+
+4.Narrative descriptions of data cleanup work, analysis, and conclusions.<br/><br/>
+
+Data cleanup processes are commented above.<br/><br/>
+Analysis:   
+Based on the barplot, AM West has higher delay rate across all cities. For the same airline, San Francisco and Seattle has obviously higher delay rate.<br/><br/>
+Conclusion:   
+Regardless of the destination (city), in order to arrive on time (or earlier), one should choose ALASKA. <br/>
+            For further exploration, it would be interesting to take price and other strategy related factors into consideration. Given a higher delay rate across board, AM WEST might using a low cost strategy.<br/>
+            On the other hand, standard of delay rate within the whole industry is even more important. While AM WEST has higher delay rate, both AM WEST and ALASKA might perform better or worse than other competitors in the industry. <br/>
+            For cities like San Francisco and Seattle, we can also look closer into data of their weather and traffic.
